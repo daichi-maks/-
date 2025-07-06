@@ -72,6 +72,80 @@ if st.button("🚀 シミュレーション開始"):
 
 else: st.info("まずは少なくとも1種類の荷物を追加してください。")
 
+import streamlit as st import plotly.graph_objects as go
+
+st.set_page_config(page_title="積込シミュレーター（複数荷物対応）") st.title("📦 荷物積込シミュレーター（3D + 複数種類対応）")
+
+st.markdown("最大10種類までの荷物を登録できます。体積の大きい順に下から積みます。")
+
+truck_length = st.number_input("トラック奥行 (mm)", value=9400) truck_width = st.number_input("トラック幅 (mm)", value=2350) truck_height = st.number_input("トラック高さ (mm)", value=2000)
+
+セッションで荷物管理
+
+if "boxes" not in st.session_state: st.session_state.boxes = []
+
+st.subheader("📦 荷物の追加") with st.form("box_form"): col1, col2, col3 = st.columns(3) with col1: length = st.number_input("長さ", key="len", value=5024) width = st.number_input("幅", key="wid", value=460) with col2: height = st.number_input("高さ", key="hei", value=355) count = st.number_input("個数", key="cnt", min_value=1, value=3, step=1) with col3: color = st.color_picker("色", key="col", value="#87CEEB")
+
+submitted = st.form_submit_button("＋ この荷物を追加")
+if submitted and len(st.session_state.boxes) < 10:
+    volume = length * width * height
+    st.session_state.boxes.append({
+        "length": length,
+        "width": width,
+        "height": height,
+        "count": count,
+        "volume": volume,
+        "color": color
+    })
+
+荷物リスト表示
+
+if st.session_state.boxes: st.markdown("### 現在の荷物リスト") for i, box in enumerate(st.session_state.boxes): st.write(f"荷物{i+1}: {box['length']}×{box['width']}×{box['height']}mm, {box['count']}個, 色: {box['color']}")
+
+if st.button("🚀 シミュレーション開始"):
+    fig = go.Figure()
+    max_height_at_pos = {}  # 配置位置ごとの高さ記録
+
+    # 体積順に並べる
+    sorted_boxes = sorted(st.session_state.boxes, key=lambda x: x["volume"], reverse=True)
+
+    for box in sorted_boxes:
+        for i in range(int(box["count"])):
+            placed = False
+            for x in range(0, int(truck_width), int(box["width"])):
+                for y in range(0, int(truck_length), int(box["length"])):
+                    key = (x, y)
+                    z = max_height_at_pos.get(key, 0)
+                    if z + box["height"] <= truck_height:
+                        fig.add_trace(go.Mesh3d(
+                            x=[x, x+box["width"], x+box["width"], x, x, x+box["width"], x+box["width"], x],
+                            y=[y, y, y+box["length"], y+box["length"], y, y, y+box["length"], y+box["length"]],
+                            z=[z, z, z, z, z+box["height"], z+box["height"], z+box["height"], z+box["height"]],
+                            color=box["color"],
+                            opacity=0.7,
+                            alphahull=0
+                        ))
+                        max_height_at_pos[key] = z + box["height"]
+                        placed = True
+                        break
+                if placed:
+                    break
+
+    fig.update_layout(
+        scene=dict(
+            xaxis=dict(title="幅", range=[0, truck_width]),
+            yaxis=dict(title="奥行", range=[0, truck_length]),
+            zaxis=dict(title="高さ", range=[0, truck_height])
+        ),
+        margin=dict(l=0, r=0, b=0, t=0),
+        height=700
+    )
+
+    st.success("✨ シミュレーション完了！")
+    st.plotly_chart(fig, use_container_width=True)
+
+else: st.info("まずは少なくとも1種類の荷物を追加してください。")
+
 import streamlit as st
 import plotly.graph_objects as go
 
